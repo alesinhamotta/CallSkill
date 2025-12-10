@@ -1,105 +1,121 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import scrolledtext, messagebox
 import random
 import pyttsx3
 import speech_recognition as sr
+from openai import OpenAI
+import threading
 
-# Voz do cliente - agora funciona 100%
+# SUA CHAVE OPENAI
+client = OpenAI(api_key="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")
+
 engine = pyttsx3.init()
-engine.setProperty('rate', 160)
-engine.setProperty('volume', 1.0)
+engine.setProperty('rate', 175)
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[0].id)  # 0 mulher, 1 homem
 
-BOOK_PLANOS = {
-    "Pré-Pago Básico": {"sugestao": "Migração para Controle Médio: +10GB por R$30/mês com desconto!"},
-    "Fibra 500Mbps": {"sugestao": "Combo Fibra 500MB + Chip 50GB: R$149/mês. Ativação e-SIM grátis!"},
-    "e-SIM Pré": {"sugestao": "Ativação e-SIM R$5 + migração para Pós com +20GB!"},
-}
-
-CLIENTES_TIPOS = {
-    "Ignorante": {"frase": "Ei, resolve logo isso! Internet cortada, paguei ontem e nada!", "personalidade": "Impaciente"},
-    "Legal": {"frase": "Oi, tudo bem? Minha internet foi cortada, mas já paguei. Pode ajudar?", "personalidade": "Cooperativo"},
-    "Idoso": {"frase": "Alô? Minha internet parou, filha. Eu paguei, mas não entendo esses computadores...", "personalidade": "Lento"},
-    "Jovem": {"frase": "Galera, net caiu de novo. Paguei via app, mas tá sem sinal. Fixa aí!", "personalidade": "Tech"},
-}
+CENARIOS = [
+    "chip pré-pago suspenso por falta de recarga",
+    "fibra cortada por falta de pagamento",
+    "pedir segunda via de fatura",
+    "mudar titularidade de linha pós",
+    "controle acabou todos os dados",
+    "cliente reclamão que odeia tudo",
+    "quer fazer portabilidade pra Alive",
+    "quer pacote adicional de dados"
+]
 
 class CallSkillSimulador:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Call Skill - Treinamento Alive")
-        self.root.geometry("700x650")
+        self.root.title("Call Skill – Treinamento Vivo/Alive")
+        self.root.geometry("1000x800")
         self.root.configure(bg="#f0f0f0")
-        self.usuario = None
-        self.login_tela()
+        self.usuario = "Alessandra"
+        self.conversa = []
+        self.cenario = random.choice(CENARIOS)
+        self.janela_chamada()
 
-    def login_tela(self):
-        for w in self.root.winfo_children():
-            w.destroy()
-        tk.Label(self.root, text="CALL SKILL", font=("Arial", 28, "bold"), bg="#f0f0f0", fg="#1a73e8").pack(pady=50)
-        tk.Label(self.root, text="Treinamento Realista para Atendentes Alive", font=("Arial", 14), bg="#f0f0f0").pack(pady=20)
-        nome = simpledialog.askstring("Login", "Digite seu nome:")
-        if nome:
-            self.usuario = nome.strip().title()
-            messagebox.showinfo("Sucesso!", f"Olá, {self.usuario}! Vamos treinar?")
-            self.dashboard()
+    def falar(self, texto):
+        def run():
+            engine.say(texto)
+            engine.runAndWait()
+        threading.Thread(target=run, daemon=True).start()  # <-- não trava mais
 
-    def dashboard(self):
-        for w in self.root.winfo_children():
-            w.destroy()
-        tk.Label(self.root, text=f"Atendente: {self.usuario}", font=("Arial", 20, "bold"), bg="#f0f0f0").pack(pady=40)
-        tk.Button(self.root, text="ATENDER NOVA CHAMADA", command=self.simular_chamada,
-                  bg="#0f9d58", fg="white", font=("Arial", 16, "bold"), height=3, width=30).pack(pady=40)
-
-    def simular_chamada(self):
-        tipo = random.choice(list(CLIENTES_TIPOS.keys()))
-        cliente = CLIENTES_TIPOS[tipo]
-        plano = random.choice(list(BOOK_PLANOS.keys()))
-
-        j = tk.Toplevel(self.root)
-        j.title(f"Chamada - {tipo}")
-        j.geometry("900x750")
+    def janela_chamada(self):
+        j = self.root
         j.configure(bg="white")
 
-        tk.Label(j, text="TOQUE! CHAMADA ENTRANDO...", font=("Arial", 18, "bold"), fg="red", bg="white").pack(pady=20)
+        tk.Label(j, text="TOQUE! CHAMADA ENTRANDO...", font=("Arial", 20, "bold"), fg="red", bg="white").pack(pady=30)
+        tk.Label(j, text=f"Cenário: {self.cenario.upper()}", font=("Arial", 14, "italic"), bg="white").pack(pady=10)
 
-        chat = tk.Text(j, height=22, width=105, font=("Consolas", 11), bg="#f8f9fa")
-        chat.pack(pady=10, padx=20)
-        chat.tag_config("upsell", foreground="#0f9d58", font=("Consolas", 11, "bold"))
-        chat.tag_config("you", foreground="#1a73e8", font=("Consolas", 11, "bold"))
-        chat.insert("end", f"Tipo: {cliente['personalidade']} | Plano: {plano}\n\n")
+        chat = scrolledtext.ScrolledText(j, height=28, font=("Consolas", 12), bg="#f8f9fa")
+        chat.pack(pady=20, padx=20, fill="both", expand=True)
+        chat.tag_config("you", foreground="#1a73e8", font=("Consolas", 12, "bold"))
+        chat.tag_config("client", foreground="#d93025")
+        chat.tag_config("upsell", foreground="#0f9d58", font=("Consolas", 12, "bold"))
 
-        engine.say(cliente['frase'])
-        engine.runAndWait()
-        chat.insert("end", f"Cliente: {cliente['frase']}\n\n")
+        # primeira fala do cliente
+        prompt = f"Você é cliente da Alive. Problema: {self.cenario}. Nunca dê a solução sozinho, só reclame ou peça ajuda. Fale em português brasileiro natural."
+        resposta = self.chamar_ia(prompt)
+        self.falar(resposta)
+        chat.insert("end", f"Cliente: {resposta}\n\n", "client")
+        self.conversa.append({"role": "user", "content": resposta})
 
-        def falar():
+        def responder_com_voz():
+            r = sr.Recognizer()
+            r.energy_threshold = 100
+            r.dynamic_energy_threshold = False
+
+            with sr.Microphone() as source:
+                r.adjust_for_ambient_noise(source, duration=0.5)
+                chat.insert("end", "🎤 FALE AGORA!\n", "you")
+                chat.see("end")
+                j.update()
+                try:
+                    audio = r.listen(source, timeout=30, phrase_time_limit=25)
+                except:
+                    chat.insert("end", "Não ouvi nada...\n\n")
+                    return
+
             try:
-                with sr.Microphone(device_index=12) as source:
-                    r = sr.Recognizer()
-                    r.energy_threshold = 100
-                    r.dynamic_energy_threshold = False
-                    r.adjust_for_ambient_noise(source, duration=0.3)
-                    chat.insert("end", "🎤 FALE AGORA!\n")
-                    chat.see("end")
-                    j.update()
-                    audio = r.listen(source, timeout=15, phrase_time_limit=12)
-
                 texto = r.recognize_google(audio, language="pt-BR")
                 chat.insert("end", f"Você ({self.usuario}): {texto}\n\n", "you")
+                self.conversa.append({"role": "assistant", "content": texto})
 
-                resp = random.choice(["Tá bom, pode consultar.", "Um minutinho.", "Vou verificar agora."])
-                engine.say(resp)
-                engine.runAndWait()
-                chat.insert("end", f"Cliente: {resp}\n\n")
+                resposta = self.chamar_ia("Continue como cliente. Nunca resolva o problema sozinho. Só reclame ou peça ajuda. Português brasileiro.")
+                self.falar(resposta)
+                chat.insert("end", f"Cliente: {resposta}\n\n", "client")
+                self.conversa.append({"role": "user", "content": resposta})
 
-                if any(p in texto.lower() for p in ["cpf", "olhar", "ver", "consultar"]):
-                    chat.insert("end", f"UPSELL → {BOOK_PLANOS[plano]['sugestao']}\n\n", "upsell")
+                if any(p in texto.lower() for p in ["plano","fibra","chip","migração","controle","pós"]):
+                    chat.insert("end", "UPSELL → Migração para Controle Médio +10GB R$30/mês!\n\n", "upsell")
 
-            except Exception as e: 
-                chat.insert("end", f"Erro: {e}\n\n")
+            except:
+                chat.insert("end", "Não entendi... repete?\n\n")
 
-        tk.Button(j, text="RESPONDER COM VOZ", command=falar, bg="#1a73e8", fg="white", font=("Arial", 14, "bold")).pack(pady=20)
+        tk.Button(j, text="RESPONDER COM VOZ", command=responder_com_voz,
+                  bg="#1a73e8", fg="white", font=("Arial", 16, "bold"), height=2, width=30).pack(pady=30)
 
-        tk.Button(j, text="FINALIZAR CHAMADA", command=j.destroy, bg="#db4437", fg="white", font=("Arial", 14, "bold")).pack(pady=20)
+        def finalizar():
+            feedback = self.chamar_ia("Você é supervisor da Alive. Analise o atendimento. Pontos positivos, negativos e dicas em português.")
+            messagebox.showinfo("FEEDBACK", feedback)
+            self.root.destroy()
+
+        tk.Button(j, text="FINALIZAR CHAMADA", command=finalizar,
+                  bg="#db4437", fg="white", font=("Arial", 16, "bold")).pack(pady=20)
+
+    def chamar_ia(self, prompt):
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": prompt}] + self.conversa,
+                temperature=0.8,
+                max_tokens=400
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            return f"Erro: {e}"
 
     def run(self):
         self.root.mainloop()
